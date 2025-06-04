@@ -1,0 +1,14 @@
+__pycache__/
+*.old
+*.log
+*.pyc
+*.tmp
+*.tmp.*
+*.swp
+*.db
+.venv
+scratch*/
+.vscode/
+.DS_Store
+.test.env
+.env
