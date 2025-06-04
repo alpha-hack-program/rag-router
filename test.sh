@@ -8,7 +8,7 @@ else
   exit 1
 fi
 
-MODEL_MAP_PATH=$(pwd)/tests/model_map.json
+MODEL_MAP_PATH=$(pwd)/scratch/model_map.json
 # Fail if MODEL_MAP_PATH file does not exist
 if [ ! -f "${MODEL_MAP_PATH}" ]; then
   echo "Model map file not found at ${MODEL_MAP_PATH}. Please ensure it exists."
