@@ -94,7 +94,7 @@ function run() {
   echo "    Host:      ${MODEL_MAP_PATH_ON_HOST}"
   echo "    Container: ${MODEL_MAP_PATH_IN_CONTAINER}"
 
-  podman run --rm -it --net=host --name rag-router \
+  podman run --rm -it --name rag-router \
     --env-file "${ENV_FILE}" \
     -p "${PORT}:${PORT}" \
     -v "${MODEL_MAP_PATH_ON_HOST}:${MODEL_MAP_PATH_IN_CONTAINER}:ro" \
