@@ -39,9 +39,23 @@ function push() {
   echo "✅ Image pushed to: ${REMOTE_IMAGE}"
 }
 
-# --- Run the image locally ---
+# --- Run the image ---
 function run() {
-  echo "🚀 Running image ${LOCAL_IMAGE} on port ${PORT}..."
+  USE_REMOTE=false
+
+  if [[ "${1:-}" == "--remote" ]]; then
+    USE_REMOTE=true
+    shift
+  fi
+
+  IMAGE_TO_RUN="${LOCAL_IMAGE}"
+  if $USE_REMOTE; then
+    echo "🌐 Pulling remote image ${REMOTE_IMAGE}..."
+    podman pull "${REMOTE_IMAGE}"
+    IMAGE_TO_RUN="${REMOTE_IMAGE}"
+  else
+    echo "🚀 Running local image ${LOCAL_IMAGE} on port ${PORT}..."
+  fi
 
   # Pick env file
   if [ -f .test.env ]; then
@@ -60,7 +74,6 @@ function run() {
   if [[ "$MODEL_MAP_PATH_IN_CONTAINER_RAW" = /* ]]; then
     MODEL_MAP_PATH_IN_CONTAINER="$MODEL_MAP_PATH_IN_CONTAINER_RAW"
   else
-    # We'll mount it under /app if it's relative
     MODEL_MAP_PATH_IN_CONTAINER="/app/$MODEL_MAP_PATH_IN_CONTAINER_RAW"
   fi
 
@@ -85,23 +98,24 @@ function run() {
     --env-file "${ENV_FILE}" \
     -p "${PORT}:${PORT}" \
     -v "${MODEL_MAP_PATH_ON_HOST}:${MODEL_MAP_PATH_IN_CONTAINER}:ro" \
-    "${LOCAL_IMAGE}"
+    "${IMAGE_TO_RUN}"
 }
 
 # --- Show usage ---
 function help() {
-  echo "Usage: ./image.sh [build|push|run|all]"
-  echo "  build   Build the container image"
-  echo "  push    Push the image to the registry"
-  echo "  run     Run the image locally"
-  echo "  all     Build, push, and run"
+  echo "Usage: ./image.sh [build|push|run [--remote]|all]"
+  echo "  build         Build the container image"
+  echo "  push          Push the image to the registry"
+  echo "  run           Run the local image"
+  echo "  run --remote  Run the image pulled from the registry"
+  echo "  all           Build, push, and run locally"
 }
 
 # --- Entrypoint ---
 case "${1:-}" in
   build) build ;;
   push) push ;;
-  run) run ;;
+  run) shift; run "$@" ;;
   all)
     build
     push
