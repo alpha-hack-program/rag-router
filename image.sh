@@ -97,7 +97,7 @@ function run() {
   podman run --rm -it --name rag-router \
     --env-file "${ENV_FILE}" \
     -p "${PORT}:${PORT}" \
-    -v "${MODEL_MAP_PATH_ON_HOST}:${MODEL_MAP_PATH_IN_CONTAINER}:ro" \
+    -v "${MODEL_MAP_PATH_ON_HOST}:${MODEL_MAP_PATH_IN_CONTAINER}:ro,Z" \
     "${IMAGE_TO_RUN}"
 }
 
