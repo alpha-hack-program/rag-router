@@ -12,3 +12,9 @@ scratch*/
 .DS_Store
 .test.env
 .env
+old/
+bkp/
+*.bak
+*.swp
+*.swo
+*.swn
