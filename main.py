@@ -72,12 +72,16 @@ if not OPENAI_EMBEDDING_MODEL:
     raise RuntimeError("OpenAI embedding model must be set in environment variables.")
 
 # Environment variables for Milvus configuration
-MILVUS_HOST = os.getenv("MILVUS_HOST", "localhost")
-MILVUS_PORT = os.getenv("MILVUS_PORT", "19530")
 MILVUS_USERNAME = os.getenv("MILVUS_USERNAME", "")
 MILVUS_PASSWORD = os.getenv("MILVUS_PASSWORD", "")
 MILVUS_DATABASE = os.getenv("MILVUS_DATABASE", "default")
 MILVUS_COLLECTION_NAME = os.getenv("MILVUS_COLLECTION_NAME", "documents")
+MILVUS_HOST = os.getenv("MILVUS_HOST", "localhost")
+try:
+    MILVUS_PORT = int(os.getenv("MILVUS_PORT", "19530"))
+except ValueError:
+    raise RuntimeError(f"Invalid MILVUS_PORT value: {os.getenv('MILVUS_PORT')}. It must be an integer.")
+
 
 # Runtime error handling for Milvus configuration
 if not MILVUS_HOST or not MILVUS_PORT:
