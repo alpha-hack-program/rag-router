@@ -2,6 +2,7 @@ import os
 import sys
 import logging
 import json
+from token import OP
 
 from fastapi import FastAPI, Request, Header, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -71,6 +72,9 @@ if not EMBEDDING_MAP_PATH:
 # Check if EMBEDDINGS_DEFAULT_MODEL is set
 if not EMBEDDINGS_DEFAULT_MODEL:
     raise RuntimeError("EMBEDDINGS_DEFAULT_MODEL must be set in environment variables.")
+
+# Load the openai key from environment variable
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 try:
     with open(EMBEDDING_MAP_PATH, "r") as f:
@@ -192,7 +196,14 @@ async def openai_chat_completions(
     top_p = body.get("top_p", 1.0)
     max_tokens = body.get("max_tokens", 512)
     stream = body.get("stream", True)
+    openai_key = body.get("openai_key")
 
+    # Check the provided OpenAI key is vald against the configured key
+    if OPENAI_API_KEY and openai_key != OPENAI_API_KEY:
+        _log.warning("Provided OpenAI key does not match the configured key.")
+        raise HTTPException(status_code=403, detail="Invalid OpenAI API key.")
+    
+    # Validate the messages structure
     query_text = messages[-1]["content"] if messages else ""
 
     _log.debug(f"Received query: {query_text}")
