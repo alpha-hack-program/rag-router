@@ -52,6 +52,7 @@ configure_logging()
 _log = logging.getLogger(__name__)
 
 # Load model config map from file
+MODEL_URL_SUFFIX = os.getenv("MODEL_URL_SUFFIX", "v1/chat/completions")
 MODEL_MAP_PATH = os.getenv("MODEL_MAP_PATH", "/etc/secrets/model_map.json")
 
 try:
@@ -60,16 +61,34 @@ try:
 except Exception as e:
     raise RuntimeError(f"Failed to load model configuration from {MODEL_MAP_PATH}: {e}")
 
-# Environment variables for OpenAI API configuration
-OPENAI_EMBEDDING_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_EMBEDDING_URL = os.getenv("OPENAI_EMBEDDING_URL", "")
-OPENAI_EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "")
+# Load embedding config map from file
+EMBEDDING_MAP_PATH = os.getenv("EMBEDDING_MAP_PATH")
+EMBEDDINGS_DEFAULT_MODEL = os.getenv("EMBEDDINGS_DEFAULT_MODEL")
 
-# Runtime error handling for OpenAI API keys
-if not OPENAI_EMBEDDING_URL:
-    raise RuntimeError("OpenAI embedding URL must be set in environment variables.")
-if not OPENAI_EMBEDDING_MODEL:
-    raise RuntimeError("OpenAI embedding model must be set in environment variables.")
+# Check if EMBEDDING_MAP_PATH is set
+if not EMBEDDING_MAP_PATH:
+    raise RuntimeError("EMBEDDING_MAP_PATH must be set in environment variables.")
+# Check if EMBEDDINGS_DEFAULT_MODEL is set
+if not EMBEDDINGS_DEFAULT_MODEL:
+    raise RuntimeError("EMBEDDINGS_DEFAULT_MODEL must be set in environment variables.")
+
+try:
+    with open(EMBEDDING_MAP_PATH, "r") as f:
+        EMBEDDING_CONFIG_MAP = json.load(f)
+except Exception as e:
+    raise RuntimeError(f"Failed to load embedding configuration from {EMBEDDING_MAP_PATH}: {e}")
+
+embedding_config = EMBEDDING_CONFIG_MAP.get(EMBEDDINGS_DEFAULT_MODEL)
+if embedding_config is None:
+    raise RuntimeError(f"Embedding model '{EMBEDDINGS_DEFAULT_MODEL}' not found in embeddings map.")
+
+EMBEDDING_URL_SUFFIX = embedding_config.get("url_suffix", "v1/embeddings")
+OPENAI_EMBEDDING_API_KEY = embedding_config.get("api_key", "")
+OPENAI_EMBEDDING_URL = embedding_config.get("url", "")
+OPENAI_EMBEDDING_MODEL = embedding_config.get("model", "")
+
+if not OPENAI_EMBEDDING_URL or not OPENAI_EMBEDDING_MODEL:
+    raise RuntimeError("Incomplete embedding model configuration.")
 
 # Environment variables for Milvus configuration
 MILVUS_USERNAME = os.getenv("MILVUS_USERNAME", "")
@@ -158,7 +177,7 @@ async def openai_chat_completions(
     if model_config is None:
         raise HTTPException(status_code=400, detail=f"Unsupported model: {model_name}")
 
-    chat_url = model_config.get("url")
+    chat_url = f'{model_config.get("url")}/{MODEL_URL_SUFFIX}'
     chat_model = model_config.get("model")
     chat_api_key = model_config.get("api_key")
 
@@ -179,9 +198,10 @@ async def openai_chat_completions(
     _log.debug(f"Received query: {query_text}")
 
     # Generate the query vector using OpenAI's embedding API
+    openai_embedding_url = f'{OPENAI_EMBEDDING_URL}/{EMBEDDING_URL_SUFFIX}'
     query_vector = await get_vector(
         text=query_text,
-        url=OPENAI_EMBEDDING_URL,
+        url=openai_embedding_url,
         model=OPENAI_EMBEDDING_MODEL,
         openai_key=OPENAI_EMBEDDING_API_KEY
     )
