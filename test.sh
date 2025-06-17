@@ -48,7 +48,7 @@ export MILVUS_DATABASE_NAME MILVUS_COLLECTION_NAME
 # Run the Python script
 export LOG_LEVEL=DEBUG
 
-uvicorn main:app --log-level debug --host 0.0.0.0 --port 7777 --reload
+uvicorn main:app --log-level debug --host 0.0.0.0 --port 7856 --reload
 if [ $? -ne 0 ]; then
   echo "Python script execution failed."
   exit 1

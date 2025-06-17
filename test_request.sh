@@ -17,10 +17,13 @@ if [[ $# -eq 0 ]]; then
 fi
 
 QUERY="$*"
-HOST_IP=localhost
-RAG_ROUTER_URL="http://${HOST_IP}:7777/v1/chat/completions"
+ROUTER_HOST=${ROUTER_HOST:-http://localhost:7856}
+echo "Using RAG router at: ${ROUTER_HOST}"
+RAG_ROUTER_URL="${ROUTER_HOST}/v1/chat/completions"
+echo "RAG Router URL: ${RAG_ROUTER_URL}"
+echo "Query: ${QUERY}"
 
-CHAT_MODEL=granite-3-1-8b
+CHAT_MODEL=granite-3-3-8b
 # CHAT_MODEL=mistral-7b-instruct-v0-3
 # CHAT_MODEL=llama-3-1-8b
 

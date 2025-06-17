@@ -52,6 +52,9 @@ configure_logging()
 # Logging instance for this module
 _log = logging.getLogger(__name__)
 
+# MINMUM COSINE DISTANCE
+MINIMUM_COSINE_DISTANCE = float(os.getenv("MINIMUM_COSINE_DISTANCE", "0.85"))
+
 # Load model config map from file
 MODEL_URL_SUFFIX = os.getenv("MODEL_URL_SUFFIX", "v1/chat/completions")
 MODEL_MAP_PATH = os.getenv("MODEL_MAP_PATH", "/etc/secrets/model_map.json")
@@ -221,7 +224,7 @@ async def openai_chat_completions(
 
     _log.debug(f"Generated query vector of length: {len(query_vector)}")
     
-    # Retrieve context from the database
+    # Retrieve context from the database, it should have content, source and headings
     documents = await retrieve_context(query_vector, db_type=x_db_type)
 
     if not documents:
@@ -229,11 +232,32 @@ async def openai_chat_completions(
 
     _log.debug(f"Retrieved documents: {documents}")
 
+    # Use only document with cosine distance > 0.8
+    documents = [doc for doc in documents if doc.get("distance", 0) > MINIMUM_COSINE_DISTANCE]
+
     # Build the prompt for the LLM
-    prompt = build_prompt(query_text, documents)
+    prompt = build_prompt(query_text, [doc["content"] for doc in documents])
 
     _log.debug(f"Built prompt: {prompt}")
 
+    # For each document extract references as: source -> heading1 -> heading2
+    # headings is a single string with lines separated by newlines
+    references = []
+    for doc in documents:
+        source = doc.get("source", "Unknown Source")
+        headings = doc.get("headings", "")
+        if headings:
+            headings_list = [h.strip() for h in headings.split("\n") if h.strip()]
+            if len(headings_list) == 1:
+                references.append(f"{source} -> {headings_list[0]}")
+            elif len(headings_list) > 1:
+                references.append(f"{source} -> " + " -> ".join(headings_list))
+            else:
+                references.append(source)
+        else:
+            references.append(source)
+    _log.debug(f"References extracted: {references}")
+    
     # If the request is for streaming, use the streaming endpoint
     if stream:
         return StreamingResponse(
@@ -244,7 +268,8 @@ async def openai_chat_completions(
                 top_p=top_p,
                 max_tokens=max_tokens,
                 url=chat_url,
-                openai_key=chat_api_key
+                openai_key=chat_api_key,
+                references=references
             ),
             media_type="text/event-stream"
         )
@@ -256,7 +281,8 @@ async def openai_chat_completions(
             top_p=top_p,
             max_tokens=max_tokens,
             url=chat_url,
-            openai_key=chat_api_key
+            openai_key=chat_api_key,
+            references=references
         )
         return JSONResponse(content={
             "id": "chatcmpl-mocked-id",
