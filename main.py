@@ -2,7 +2,6 @@ import os
 import sys
 import logging
 import json
-from token import OP
 
 from fastapi import FastAPI, Request, Header, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -18,14 +17,6 @@ VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 
 # Read from environment variable
 LOG_LEVEL_STR = os.getenv("LOG_LEVEL", "WARNING").upper()
-
-# --- Chat-prompt configuration ---------------------------------------------
-BASE_SYSTEM_PROMPT = (
-    "You are a retrieval-augmented generation (RAG) assistant. "
-    "Answer the user’s question as helpfully as possible. "
-    "Use the information inside <doc> … </doc> tags when relevant; "
-    "if the context is insufficient, say you don’t know."
-)
 
 def configure_logging():
     """Ensure logging is configured early and correctly."""
@@ -52,8 +43,9 @@ configure_logging()
 # Logging instance for this module
 _log = logging.getLogger(__name__)
 
-# MINMUM COSINE DISTANCE
+# Configuration for thresholds
 MINIMUM_COSINE_DISTANCE = float(os.getenv("MINIMUM_COSINE_DISTANCE", "0.85"))
+TOP_K = int(os.getenv("TOP_K", "5"))
 
 # Load model config map from file
 MODEL_URL_SUFFIX = os.getenv("MODEL_URL_SUFFIX", "v1/chat/completions")
@@ -206,6 +198,14 @@ async def openai_chat_completions(
         _log.warning("Provided OpenAI key does not match the configured key.")
         raise HTTPException(status_code=403, detail="Invalid OpenAI API key.")
     
+    # DEBUG parameters
+    _log.debug(f"Model: {chat_model}")
+    _log.debug(f"Messages: {messages}")
+    _log.debug(f"Temperature: {temperature}")
+    _log.debug(f"Top P: {top_p}")
+    _log.debug(f"Max Tokens: {max_tokens}")
+    _log.debug(f"Stream: {stream}")
+
     # Validate the messages structure
     query_text = messages[-1]["content"] if messages else ""
 
@@ -225,14 +225,14 @@ async def openai_chat_completions(
     _log.debug(f"Generated query vector of length: {len(query_vector)}")
     
     # Retrieve context from the database, it should have content, source and headings
-    documents = await retrieve_context(query_vector, db_type=x_db_type)
+    documents = await retrieve_context(query_vector, db_type=x_db_type, top_k=TOP_K)
 
     if not documents:
         _log.warning("No documents found for the given query vector.")
 
     _log.debug(f"Retrieved documents: {documents}")
 
-    # Use only document with cosine distance > 0.8
+    # Use only document with cosine distance > MINIMUM_COSINE_DISTANCE
     documents = [doc for doc in documents if doc.get("distance", 0) > MINIMUM_COSINE_DISTANCE]
 
     # Build the prompt for the LLM

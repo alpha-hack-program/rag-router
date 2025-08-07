@@ -23,28 +23,12 @@ RAG_ROUTER_URL="${ROUTER_HOST}/v1/chat/completions"
 echo "RAG Router URL: ${RAG_ROUTER_URL}"
 echo "Query: ${QUERY}"
 
-CHAT_MODEL=granite-3-3-8b
+# CHAT_MODEL=granite-3-3-8b
 # CHAT_MODEL=mistral-7b-instruct-v0-3
-# CHAT_MODEL=llama-3-1-8b
+CHAT_MODEL=llama-3-1-8b-w4a16
 
-echo "== Non-streaming =="
-curl -sS -X POST "${RAG_ROUTER_URL}" \
-  -H "Content-Type: application/json" \
-  -H "x-db-type: milvus" \
-  -d @<(cat <<EOF
-{
-  "model": "${CHAT_MODEL}",
-  "messages": [
-    { "role": "user", "content": "${QUERY//\"/\\\"}" }
-  ],
-  "temperature": 0.7,
-  "top_p": 1.0,
-  "max_tokens": 200,
-  "stream": false
-}
-EOF
-)
-
+# If environment variable USE_STREAMING is set, use streaming
+if [[ "${USE_STREAMING:-false}" == "true" ]]; then
 echo -e "\n\n== Streaming =="
 curl -sS -N -X POST "$RAG_ROUTER_URL" \
   -H "Content-Type: application/json" \
@@ -62,3 +46,26 @@ curl -sS -N -X POST "$RAG_ROUTER_URL" \
 }
 EOF
 )
+else
+echo "== Non-streaming =="
+curl -sS -X POST "${RAG_ROUTER_URL}" \
+  -H "Content-Type: application/json" \
+  -H "x-db-type: milvus" \
+  -d @<(cat <<EOF
+{
+  "model": "${CHAT_MODEL}",
+  "messages": [
+    { "role": "user", "content": "${QUERY//\"/\\\"}" }
+  ],
+  "temperature": 0.7,
+  "top_p": 1.0,
+  "max_tokens": 200,
+  "stream": false
+}
+EOF
+)
+fi
+
+
+
+
