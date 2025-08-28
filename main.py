@@ -5,6 +5,7 @@ import json
 
 from fastapi import FastAPI, Request, Header, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
+from agent_builder import build_agents_for_available_models, build_llama_stack_client
 from vectorizer import get_vector
 from retriever import retrieve_context
 from prompt_builder import build_prompt
@@ -100,7 +101,6 @@ try:
 except ValueError:
     raise RuntimeError(f"Invalid MILVUS_PORT value: {os.getenv('MILVUS_PORT')}. It must be an integer.")
 
-
 # Runtime error handling for Milvus configuration
 if not MILVUS_HOST or not MILVUS_PORT:
     raise RuntimeError("Milvus host and port must be set in environment variables.")
@@ -108,6 +108,13 @@ if not MILVUS_USERNAME or not MILVUS_PASSWORD:
     raise RuntimeError("Milvus username and password must be set in environment variables.")
 
 _log.debug(">>> Module loaded and logger configured.")
+
+# Check if LLAMA_STACK_URL is set
+LLAMA_STACK_URL = os.getenv("LLAMA_STACK_URL", "")
+if LLAMA_STACK_URL:
+    client = build_llama_stack_client(LLAMA_STACK_URL)
+    agents = build_agents_for_available_models(client)
+    _log.info(f"Agents built: {agents}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -315,3 +322,48 @@ async def list_models():
 @app.get("/test")
 async def test_endpoint():
     return {"message": "Hello from external IP test", "status": "success"}
+
+@app.get("/health")
+async def health_probe():
+    """
+    Health probe endpoint for Kubernetes.
+
+    This service is not healthy if:
+    - there are no models
+    - there are models but they do not respond to GET /v1/models with a 200 status code, uses httpx.AsyncClient to test
+    - there are agents but they fail to test query
+    """
+    import httpx
+
+    # 1. Check if there are any models configured
+    if not MODEL_CONFIG_MAP or not isinstance(MODEL_CONFIG_MAP, dict) or len(MODEL_CONFIG_MAP) == 0:
+        return JSONResponse(status_code=503, content={"status": "unhealthy", "reason": "No models configured"})
+
+    # 2. Check if /v1/models responds with 200. For each value in MODEL_CONFIG_MAP, get base_url and api_key and test the endpoint.
+    try:
+        async with httpx.AsyncClient() as client:
+            for _model_name, model_config in MODEL_CONFIG_MAP.items():
+                base_url = model_config.get("url")
+                api_key = model_config.get("api_key")
+                url = f"{base_url}/v1/models"
+                resp = await client.get(url, headers={"Authorization": f"Bearer {api_key}"}, timeout=5)
+                if resp.status_code != 200:
+                    return JSONResponse(status_code=503, content={"status": "unhealthy", "reason": f"/v1/models returned {resp.status_code}"})            
+    except Exception as e:
+        return JSONResponse(status_code=503, content={"status": "unhealthy", "reason": f"Exception contacting /v1/models: {str(e)}"})
+
+    # 3. If agents exist, try to test query (if agents are built)
+    if "agents" in globals() and agents:
+        try:
+            # For each agent, try to test query
+            for agent in agents.values():
+                try:
+                    result = agent.run("health check")
+                    if result.get("status") != "success":
+                        return JSONResponse(status_code=503, content={"status": "unhealthy", "reason": f"Agent test failed: {result.get('reason')}"})
+                except Exception as e:
+                    return JSONResponse(status_code=503, content={"status": "unhealthy", "reason": f"Agent test failed: {str(e)}"})
+        except Exception as e:
+            return JSONResponse(status_code=503, content={"status": "unhealthy", "reason": f"Agent test failed: {str(e)}"})
+
+    return JSONResponse(content={"status": "healthy"})
