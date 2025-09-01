@@ -5,17 +5,12 @@ DISTRIBUTION_IMAGE=quay.io/opendatahub/llama-stack:odh
 export LLAMA_STACK_PORT=8080
 export LLAMA_STACK_SERVER=http://localhost:$LLAMA_STACK_PORT
 
-export GRANITE_3_3_8B_URL=https://granite-3-3-8b-instruct-maas-apicast-production.apps.prod.rhoai.rh-aiservices-bu.com:443/v1
-export GRANITE_3_3_8B_TLS_VERIFY=false
-export GRANITE_3_3_8B_API_TOKEN=4dd5dc2ac609cd9a3da1db7a087d0ae5
-export GRANITE_3_3_8B_MAX_TOKENS=12000
-export GRANITE_3_3_8B_MODEL=granite-3-3-8b-instruct
+if [ ! -f .env ]; then
+  echo ".env file not found. Please create it with the necessary environment variables."
+  exit 1
+fi
 
-export LLAMA_3_1_8B_W4A16_URL=https://llama-4-scout-17b-16e-w4a16-maas-apicast-production.apps.prod.rhoai.rh-aiservices-bu.com:443/v1
-export LLAMA_3_1_8B_W4A16_TLS_VERIFY=false
-export LLAMA_3_1_8B_W4A16_API_TOKEN=a91c92996e249d1fd99f4a826144c5eb
-export LLAMA_3_1_8B_W4A16_MAX_TOKENS=12000
-export LLAMA_3_1_8B_W4A16_MODEL=llama-4-scout-17b-16e-w4a16
+source .env
 
 # Curl to list the models
 curl -s -X GET -H "Authorization: Bearer ${GRANITE_3_3_8B_API_TOKEN}" ${GRANITE_3_3_8B_URL}/models | jq .
