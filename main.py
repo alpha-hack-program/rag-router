@@ -6,7 +6,6 @@ import json
 
 from fastapi import FastAPI, Request, Header, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
-from agent_builder import build_agents_for_available_models, build_llama_stack_client
 from vectorizer import get_vector
 from retriever import retrieve_context
 from prompt_builder import build_prompt
@@ -122,13 +121,6 @@ if not MILVUS_USERNAME or not MILVUS_PASSWORD:
     raise RuntimeError("Milvus username and password must be set in environment variables.")
 
 _log.debug(">>> Module loaded and logger configured.")
-
-# Check if LLAMA_STACK_URL is set
-LLAMA_STACK_URL = os.getenv("LLAMA_STACK_URL", "")
-if LLAMA_STACK_URL:
-    client = build_llama_stack_client(LLAMA_STACK_URL)
-    agents = build_agents_for_available_models(client)
-    _log.info(f"Agents built: {agents}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -350,10 +342,6 @@ async def list_models():
         ]
     })
 
-@app.get("/test")
-async def test_endpoint():
-    return {"message": "Hello from external IP test", "status": "success"}
-
 @app.get("/health")
 async def health_probe():
     """
@@ -362,7 +350,8 @@ async def health_probe():
     This service is not healthy if:
     - there are no models
     - there are models but they do not respond to GET /v1/models with a 200 status code, uses httpx.AsyncClient to test
-    - there are agents but they fail to test query
+    - there are embedding models but they do not respond to POST /v1/embeddings with a 200 status code, uses httpx.AsyncClient to test
+    - there are embedding models but they do not respond to GET /v1/models with a 200 status code, uses httpx.AsyncClient to test
     """
     import httpx
 
