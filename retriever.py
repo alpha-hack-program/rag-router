@@ -52,7 +52,7 @@ def query_milvus(
         for hit in hits
     ]
 
-async def retrieve_context(vector: List[float], db_type: str, top_k: int) -> List[Dict[str, Any]]:
+async def retrieve_context(vector: List[float], db_type: str, collection: str, top_k: int) -> List[Dict[str, Any]]:
     """
     Retrieve context from the database based on the provided vector.
     Args:
@@ -63,11 +63,8 @@ async def retrieve_context(vector: List[float], db_type: str, top_k: int) -> Lis
         List[Dict[str, Any]]: A list of dictionaries containing the retrieved context.
     """
     if db_type.lower() == "milvus":
-        collection_name = os.getenv("MILVUS_COLLECTION_NAME")
-        if not collection_name:
-            raise ValueError("MILVUS_COLLECTION_NAME environment variable is not set.")
         results = query_milvus(
-            collection_name, 
+            collection, 
             vector,
             ["content", "source", "headings", "page_number_min", "page_number_max"],
             top_k,

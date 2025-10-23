@@ -26,6 +26,7 @@ class EmbeddingConfig:
     model: str
     api_key: str
     dimension: int
+    collection: str
 
 @dataclass
 class ModelConfig:
@@ -128,8 +129,8 @@ async def lifespan(app: FastAPI):
     connections.connect(alias="default", 
                         host=MILVUS_HOST, port=MILVUS_PORT, 
                         user=MILVUS_USERNAME, password=MILVUS_PASSWORD, db_name=MILVUS_DATABASE)
-    if not utility.has_collection(MILVUS_COLLECTION_NAME):
-        raise RuntimeError("Milvus collection does not exist.")
+    # if not utility.has_collection(MILVUS_COLLECTION_NAME):
+    #     raise RuntimeError("Milvus collection does not exist.")
     _log.info("Connected to Milvus.")
     try:
         yield
@@ -259,7 +260,7 @@ async def openai_chat_completions(
     _log.debug(f"Generated query vector of length: {len(query_vector)}")
     
     # Retrieve context from the database, it should have content, source and headings
-    documents = await retrieve_context(query_vector, db_type=x_db_type, top_k=TOP_K)
+    documents = await retrieve_context(query_vector, db_type=x_db_type, collection=embedding_model_config.collection, top_k=TOP_K)
 
     if not documents:
         _log.warning("No documents found for the given query vector.")
