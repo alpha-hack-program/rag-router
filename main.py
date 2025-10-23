@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import os
 import sys
 import logging
@@ -5,6 +6,7 @@ import json
 
 from fastapi import FastAPI, Request, Header, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
+from agent_builder import build_agents_for_available_models, build_llama_stack_client
 from vectorizer import get_vector
 from retriever import retrieve_context
 from prompt_builder import build_prompt
@@ -18,6 +20,22 @@ VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 # Read from environment variable
 LOG_LEVEL_STR = os.getenv("LOG_LEVEL", "WARNING").upper()
 
+@dataclass
+class EmbeddingConfig:
+    """Configuration for embedding model"""
+    url: str
+    model: str
+    api_key: str
+    dimension: int
+
+@dataclass
+class ModelConfig:
+    """Configuration for model"""
+    url: str
+    model: str
+    api_key: str
+
+# Configure logging
 def configure_logging():
     """Ensure logging is configured early and correctly."""
     if LOG_LEVEL_STR not in VALID_LOG_LEVELS:
@@ -57,16 +75,13 @@ try:
 except Exception as e:
     raise RuntimeError(f"Failed to load model configuration from {MODEL_MAP_PATH}: {e}")
 
-# Load embedding config map from file
+# Load embedding model URL suffix and config map from path
+EMBEDDING_URL_SUFFIX = os.getenv("EMBEDDING_URL_SUFFIX", "v1/embeddings")
 EMBEDDING_MAP_PATH = os.getenv("EMBEDDING_MAP_PATH")
-EMBEDDINGS_DEFAULT_MODEL = os.getenv("EMBEDDINGS_DEFAULT_MODEL")
 
 # Check if EMBEDDING_MAP_PATH is set
 if not EMBEDDING_MAP_PATH:
     raise RuntimeError("EMBEDDING_MAP_PATH must be set in environment variables.")
-# Check if EMBEDDINGS_DEFAULT_MODEL is set
-if not EMBEDDINGS_DEFAULT_MODEL:
-    raise RuntimeError("EMBEDDINGS_DEFAULT_MODEL must be set in environment variables.")
 
 # Load the openai key from environment variable
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
@@ -77,17 +92,17 @@ try:
 except Exception as e:
     raise RuntimeError(f"Failed to load embedding configuration from {EMBEDDING_MAP_PATH}: {e}")
 
-embedding_config = EMBEDDING_CONFIG_MAP.get(EMBEDDINGS_DEFAULT_MODEL)
-if embedding_config is None:
-    raise RuntimeError(f"Embedding model '{EMBEDDINGS_DEFAULT_MODEL}' not found in embeddings map.")
+try:
+    # Convert the embedding config map to a dictionary of EmbeddingConfig objects
+    EMBEDDING_CONFIG_MAP = {k: EmbeddingConfig(**v) for k, v in EMBEDDING_CONFIG_MAP.items()}
+except Exception as e:
+    raise RuntimeError(f"Failed to convert model configuration to ModelConfig objects: {e}")
 
-EMBEDDING_URL_SUFFIX = embedding_config.get("url_suffix", "v1/embeddings")
-OPENAI_EMBEDDING_API_KEY = embedding_config.get("api_key", "")
-OPENAI_EMBEDDING_URL = embedding_config.get("url", "")
-OPENAI_EMBEDDING_MODEL = embedding_config.get("model", "")
-
-if not OPENAI_EMBEDDING_URL or not OPENAI_EMBEDDING_MODEL:
-    raise RuntimeError("Incomplete embedding model configuration.")
+try:
+    # Convert the model config map to a dictionary of ModelConfig objects
+    MODEL_CONFIG_MAP = {k: ModelConfig(**v) for k, v in MODEL_CONFIG_MAP.items()}
+except Exception as e:
+    raise RuntimeError(f"Failed to convert model configuration to ModelConfig objects: {e}")
 
 # Environment variables for Milvus configuration
 MILVUS_USERNAME = os.getenv("MILVUS_USERNAME", "")
@@ -100,7 +115,6 @@ try:
 except ValueError:
     raise RuntimeError(f"Invalid MILVUS_PORT value: {os.getenv('MILVUS_PORT')}. It must be an integer.")
 
-
 # Runtime error handling for Milvus configuration
 if not MILVUS_HOST or not MILVUS_PORT:
     raise RuntimeError("Milvus host and port must be set in environment variables.")
@@ -108,6 +122,13 @@ if not MILVUS_USERNAME or not MILVUS_PASSWORD:
     raise RuntimeError("Milvus username and password must be set in environment variables.")
 
 _log.debug(">>> Module loaded and logger configured.")
+
+# Check if LLAMA_STACK_URL is set
+LLAMA_STACK_URL = os.getenv("LLAMA_STACK_URL", "")
+if LLAMA_STACK_URL:
+    client = build_llama_stack_client(LLAMA_STACK_URL)
+    agents = build_agents_for_available_models(client)
+    _log.info(f"Agents built: {agents}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -172,13 +193,29 @@ async def openai_chat_completions(
     if model_name is None:
         raise HTTPException(status_code=400, detail="`model` is required in the request body.")
 
-    model_config = MODEL_CONFIG_MAP.get(model_name)
+    # Model name: model_name + '__' + embedding_model_name
+    # Split the model name by '__' and get the first part
+    model_name: str = model_name.split('__')[0]
+    embedding_model_name: str = model_name.split('__')[1]
+
+    # Get the model configuration
+    model_config: ModelConfig | None = MODEL_CONFIG_MAP.get(model_name)
     if model_config is None:
         raise HTTPException(status_code=400, detail=f"Unsupported model: {model_name}")
 
-    chat_url = f'{model_config.get("url")}/{MODEL_URL_SUFFIX}'
-    chat_model = model_config.get("model")
-    chat_api_key = model_config.get("api_key")
+    # Get the embedding model configuration
+    embedding_model_config: EmbeddingConfig | None = EMBEDDING_CONFIG_MAP.get(embedding_model_name)
+    if embedding_model_config is None:
+        raise HTTPException(status_code=400, detail=f"Unsupported embedding model: {embedding_model_name}")
+
+    embedding_url = f'{embedding_model_config.url}/{EMBEDDING_URL_SUFFIX}'
+    embedding_model = embedding_model_config.model
+    embedding_api_key = embedding_model_config.api_key
+    embedding_dimension = embedding_model_config.dimension
+
+    chat_url = f'{model_config.url}/{MODEL_URL_SUFFIX}'
+    chat_model = model_config.model
+    chat_api_key = model_config.api_key
 
     if not chat_url or not chat_model:
         raise HTTPException(status_code=500, detail="Model configuration is incomplete or missing.")
@@ -212,12 +249,12 @@ async def openai_chat_completions(
     _log.debug(f"Received query: {query_text}")
 
     # Generate the query vector using OpenAI's embedding API
-    openai_embedding_url = f'{OPENAI_EMBEDDING_URL}/{EMBEDDING_URL_SUFFIX}'
+    openai_embedding_url = f'{embedding_model_config.url}/{EMBEDDING_URL_SUFFIX}'
     query_vector = await get_vector(
         text=query_text,
         url=openai_embedding_url,
-        model=OPENAI_EMBEDDING_MODEL,
-        openai_key=OPENAI_EMBEDDING_API_KEY
+        model=embedding_model,
+        openai_key=embedding_api_key
     )
     if not query_vector:
         raise HTTPException(status_code=500, detail="Failed to generate query vector.")
@@ -304,14 +341,76 @@ async def list_models():
         "object": "list",
         "data": [
             {
-                "id": model_name,
+                "id": f"{model_name}__{embedding_model_name}",
                 "object": "model",
                 "owned_by": "local"
             }
             for model_name in MODEL_CONFIG_MAP.keys()
+            for embedding_model_name in EMBEDDING_CONFIG_MAP.keys()
         ]
     })
 
 @app.get("/test")
 async def test_endpoint():
     return {"message": "Hello from external IP test", "status": "success"}
+
+@app.get("/health")
+async def health_probe():
+    """
+    Health probe endpoint for Kubernetes.
+
+    This service is not healthy if:
+    - there are no models
+    - there are models but they do not respond to GET /v1/models with a 200 status code, uses httpx.AsyncClient to test
+    - there are agents but they fail to test query
+    """
+    import httpx
+
+    # 1. Check if there are any models configured
+    if not MODEL_CONFIG_MAP or not isinstance(MODEL_CONFIG_MAP, dict) or len(MODEL_CONFIG_MAP) == 0:
+        return JSONResponse(status_code=503, content={"status": "unhealthy", "reason": "No models configured"})
+
+    # 2. Check if /v1/models responds with 200. For each value in MODEL_CONFIG_MAP, get base_url and api_key and test the endpoint.
+    try:
+        async with httpx.AsyncClient() as client:
+            for _model_name, model_config in MODEL_CONFIG_MAP.items():
+                base_url = model_config.get("url")
+                api_key = model_config.get("api_key")
+                url = f"{base_url}/v1/models"
+                resp = await client.get(url, headers={"Authorization": f"Bearer {api_key}"}, timeout=5)
+                if resp.status_code != 200:
+                    return JSONResponse(status_code=503, content={"status": "unhealthy", "reason": f"/v1/models returned {resp.status_code}"})            
+    except Exception as e:
+        return JSONResponse(status_code=503, content={"status": "unhealthy", "reason": f"Exception contacting /v1/models: {str(e)}"})
+
+    # 3. Check if there are embedding models configured
+    if not EMBEDDING_CONFIG_MAP or not isinstance(EMBEDDING_CONFIG_MAP, dict) or len(EMBEDDING_CONFIG_MAP) == 0:
+        return JSONResponse(status_code=503, content={"status": "unhealthy", "reason": "No embedding models configured"})
+
+    # 4. Check if /v1/embeddings responds with 200. For each value in EMBEDDING_CONFIG_MAP, get base_url and api_key and test the endpoint.
+    try:
+        async with httpx.AsyncClient() as client:
+            for _embedding_model_name, embedding_model_config in EMBEDDING_CONFIG_MAP.items():
+                base_url = embedding_model_config.get("url")
+                api_key = embedding_model_config.get("api_key")
+                url = f"{base_url}/v1/embeddings"
+                resp = await client.post(url, headers={"Authorization": f"Bearer {api_key}"}, timeout=5)
+                if resp.status_code != 200:
+                    return JSONResponse(status_code=503, content={"status": "unhealthy", "reason": f"/v1/embeddings returned {resp.status_code}"})
+    except Exception as e:
+        return JSONResponse(status_code=503, content={"status": "unhealthy", "reason": f"Exception contacting /v1/embeddings: {str(e)}"})
+
+    # 5. Check if /v1/models responds with 200. For each value in EMBEDDING_CONFIG_MAP, get base_url and api_key and test the endpoint.
+    try:
+        async with httpx.AsyncClient() as client:
+            for _embedding_model_name, embedding_model_config in EMBEDDING_CONFIG_MAP.items():
+                base_url = embedding_model_config.get("url")
+                api_key = embedding_model_config.get("api_key")
+                url = f"{base_url}/v1/models"
+                resp = await client.get(url, headers={"Authorization": f"Bearer {api_key}"}, timeout=5)
+                if resp.status_code != 200:
+                    return JSONResponse(status_code=503, content={"status": "unhealthy", "reason": f"/v1/models returned {resp.status_code}"})
+    except Exception as e:
+        return JSONResponse(status_code=503, content={"status": "unhealthy", "reason": f"Exception contacting /v1/models: {str(e)}"})
+
+    return JSONResponse(content={"status": "healthy"})
