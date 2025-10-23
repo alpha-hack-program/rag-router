@@ -13,11 +13,11 @@ fi
 source .env
 
 # Curl to list the models
-curl -s -X GET -H "Authorization: Bearer ${GRANITE_3_3_8B_API_TOKEN}" ${GRANITE_3_3_8B_URL}/models | jq .
+# curl -s -X GET -H "Authorization: Bearer ${GRANITE_3_3_8B_API_TOKEN}" ${GRANITE_3_3_8B_URL}/models | jq .
 curl -s -X GET -H "Authorization: Bearer ${LLAMA_3_1_8B_W4A16_API_TOKEN}" ${LLAMA_3_1_8B_W4A16_URL}/models | jq .
 
 # Curl to test the models
-curl -s -X POST -H "Content-Type: application/json" -H "Authorization: Bearer ${GRANITE_3_3_8B_API_TOKEN}" -d '{"messages": [{"role": "user", "content": "Hello, how are you?"}], "model": "'${GRANITE_3_3_8B_MODEL}'"}' ${GRANITE_3_3_8B_URL}/chat/completions | jq .
+# curl -s -X POST -H "Content-Type: application/json" -H "Authorization: Bearer ${GRANITE_3_3_8B_API_TOKEN}" -d '{"messages": [{"role": "user", "content": "Hello, how are you?"}], "model": "'${GRANITE_3_3_8B_MODEL}'"}' ${GRANITE_3_3_8B_URL}/chat/completions | jq .
 curl -s -X POST -H "Content-Type: application/json" -H "Authorization: Bearer ${LLAMA_3_1_8B_W4A16_API_TOKEN}" -d '{"messages": [{"role": "user", "content": "Hello, how are you?"}], "model": "'${LLAMA_3_1_8B_W4A16_MODEL}'"}' ${LLAMA_3_1_8B_W4A16_URL}/chat/completions | jq .
 
 # Run the container

@@ -12,14 +12,14 @@ apis:
 - vector_io
 providers:
   inference:
-  - provider_id: granite-3-3-8b
-    provider_type: remote::vllm
-    config:
-      url: ${env.GRANITE_3_3_8B_URL}
-      model: ${env.GRANITE_3_3_8B_MODEL}
-      max_tokens: ${env.GRANITE_3_3_8B_MAX_TOKENS:12000}
-      tls_verify: ${env.GRANITE_3_3_8B_TLS_VERIFY:true}
-      api_token: ${env.GRANITE_3_3_8B_API_TOKEN}
+  # - provider_id: granite-3-3-8b
+  #   provider_type: remote::vllm
+  #   config:
+  #     url: ${env.GRANITE_3_3_8B_URL}
+  #     model: ${env.GRANITE_3_3_8B_MODEL}
+  #     max_tokens: ${env.GRANITE_3_3_8B_MAX_TOKENS:12000}
+  #     tls_verify: ${env.GRANITE_3_3_8B_TLS_VERIFY:true}
+  #     api_token: ${env.GRANITE_3_3_8B_API_TOKEN}
   - provider_id: llama-3-1-8b-w4a16
     provider_type: remote::vllm
     config:
@@ -116,10 +116,10 @@ inference_store:
   type: sqlite
   db_path: ${env.SQLITE_STORE_DIR:~/.llama/distributions/rh}/inference_store.db
 models:
-- metadata: {}
-  model_id: ${env.GRANITE_3_3_8B_MODEL}
-  provider_id: granite-3-3-8b
-  model_type: llm
+# - metadata: {}
+#   model_id: ${env.GRANITE_3_3_8B_MODEL}
+#   provider_id: granite-3-3-8b
+#   model_type: llm
 - metadata: {}
   model_id: ${env.LLAMA_3_1_8B_W4A16_MODEL}
   provider_id: llama-3-1-8b-w4a16
@@ -140,7 +140,7 @@ tool_groups:
   provider_id: tavily-search
 - toolgroup_id: builtin::rag
   provider_id: rag-runtime
-- toolgroup_id: mcp::bon-calculadora
+- toolgroup_id: mcp::eligibility
   provider_id: model-context-protocol
   mcp_endpoint:
     uri: http://host.containers.internal:8000/sse

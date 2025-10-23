@@ -12,8 +12,10 @@ from llama_stack_client.lib.agents.event_logger import EventLogger as AgentEvent
 
 def setup_environment() -> None:
     """Setup environment variables with defaults"""
-    os.environ["INFERENCE_MODEL"] = "llama-4-scout-17b-16e-w4a16"
+    # os.environ["INFERENCE_MODEL"] = "llama-4-scout-17b-16e-w4a16"
     # os.environ["INFERENCE_MODEL"] = "granite-3-3-8b-instruct"
+    os.environ["INFERENCE_MODEL"] = "llama-3-1-8b-w4a16"
+    # os.environ["INFERENCE_MODEL"] = "granite-3-3-8b"
     os.environ["INFERENCE_MODEL_PROVIDER"] = "vllm-inference"
     
     os.environ["EMBEDDING_MODEL"] = "granite-embedding-125m"
@@ -23,7 +25,7 @@ def setup_environment() -> None:
     # os.environ["EMBEDDING_DIMENSION"] = "1024"
     # os.environ["EMBEDDING_MODEL_PROVIDER"] = "vllm-inference-embedding"
     
-    os.environ["BON_CALCULADORA_TOOLGROUP_ID"] = "mcp::bon-calculadora"
+    os.environ["BON_CALCULADORA_TOOLGROUP_ID"] = "mcp::eligibility"
     os.environ["BON_CALCULADORA_MCP_ENDPOINT"] = "http://host.containers.internal:8000/sse"
 
     os.environ["LLAMA_STACK_HOST"] = "localhost"
@@ -386,14 +388,7 @@ def main() -> None:
     
     # Process user prompts
     user_prompts: List[str] = [
-        # "Soy un padre soltero con 5 hijos de menos de 3 años, tengo derecho a la ayuda por excedencia en Navarra?",
-        # "Soy un padre soltero con 5 hijos de menos de 8 años, tengo derecho a la ayuda por excedencia en Navarra?",
-        # "Soy un padre soltero con 4 hijos, tengo derecho a la ayuda por excedencia en Navarra?",
-        "Mi padre se ha roto la cadera y está hospitalizado, ¿tengo derecho a una ayuda por excedencia por cuidado de familiar en Navarra?",
-        # "Mi padre se ha roto la cadera y está hospitalizado y tengo que estar con él permanentemente en el hospital, ¿tengo derecho a una ayuda por excedencia por cuidado de familiar en Navarra?",
-        # "Acabamos de tener un hijo y tenemos otros 2 hijos de 2 y 5 años, ¿tengo derecho a una ayuda por excedencia por cuidado de hijos en Navarra?",
-        # "La mujer de mi hermano está embarazada y vive en Navarra, ¿tiene ella derecho a una ayuda por excedencia por cuidado de hijos?",
-        # "Mi cuñada está embarazada y vive en Navarra, ¿tiene derecho ella a una ayuda por excedencia por cuidado de hijos?",
+        "I have just adopted two children, at the same time, aged 3 and 5, am I elegible for the unpaid leave aid? How much?",
     ]
     
     process_user_prompts(rag_agent, user_prompts)
