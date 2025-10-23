@@ -185,15 +185,20 @@ async def openai_chat_completions(
     if model_name is None:
         raise HTTPException(status_code=400, detail="`model` is required in the request body.")
 
+    _log.debug(f"Received model name: {model_name}")
+
     # Model name: model_name + '__' + embedding_model_name
     # Split the model name by '__' and get the first part
-    model_name: str = model_name.split('__')[0]
-    embedding_model_name: str = model_name.split('__')[1]
+    model_name_parts: list[str] = model_name.split('__')
+    if len(model_name_parts) != 2:
+        raise HTTPException(status_code=400, detail=f"Invalid model name: {model_name}")
+    model_name: str = model_name_parts[0]
+    embedding_model_name: str = model_name_parts[1]
 
     # Get the model configuration
     model_config: ModelConfig | None = MODEL_CONFIG_MAP.get(model_name)
     if model_config is None:
-        raise HTTPException(status_code=400, detail=f"Unsupported model: {model_name}")
+        raise HTTPException(status_code=400, detail=f"Unsupported model: {model_name_parts[0]}")
 
     # Get the embedding model configuration
     embedding_model_config: EmbeddingConfig | None = EMBEDDING_CONFIG_MAP.get(embedding_model_name)
