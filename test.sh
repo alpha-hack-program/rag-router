@@ -45,11 +45,15 @@ echo "Using Milvus Password: ${MILVUS_PASSWORD}"
 echo "Using Milvus Database Name: ${MILVUS_DATABASE_NAME}"
 echo "Using Milvus Collection Name: ${MILVUS_COLLECTION_NAME}"
 
+# Echo the minimum cosine distance
+echo "Using Minimum Cosine Distance: ${MINIMUM_COSINE_DISTANCE}"
+echo "Using Top K: ${TOP_K}"
+
 # Export the environment variables
 export MODEL_MAP_PATH EMBEDDING_MAP_PATH PROMPTS_PATH EMBEDDINGS_DEFAULT_MODEL
 export MILVUS_HOST MILVUS_PORT MILVUS_USERNAME MILVUS_PASSWORD
 export MILVUS_DATABASE_NAME MILVUS_COLLECTION_NAME
-
+export MINIMUM_COSINE_DISTANCE TOP_K
 # Run the Python script
 export LOG_LEVEL=DEBUG
 
